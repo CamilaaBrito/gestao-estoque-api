@@ -1,0 +1,587 @@
+openapi: 3.0.3
+info:
+  title: API de Gestao de Estoque
+  version: 1.0.0
+  description: |
+    Especificacao OpenAPI para a API REST de gestao de estoque de consumo interno.
+
+    Regras de negocio principais:
+    - O saldo do item e acumulado em `total_quantity`.
+    - A API deve expor sempre a validade mais proxima em `nearest_expiry`.
+    - Nao e permitido registar uma saida (`USAGE`) acima do saldo disponivel.
+    - Toda entrada (`INPUT`) exige `unit_price`.
+    - Quantidades e valores monetarios devem preservar precisao decimal.
+    - Datas simples na API usam o formato `DD-MM-YYYY`.
+    - Regras de arredondamento 4/5 e compensacao da ultima parcela devem ser aplicadas em calculos financeiros e relatorios.
+servers:
+  - url: http://localhost:3000
+    description: Ambiente local
+tags:
+  - name: Items
+    description: Cadastro, configuracao e alertas de estoque
+  - name: Movements
+    description: Entradas e saidas com historico imutavel
+paths:
+  /items:
+    post:
+      tags:
+        - Items
+      summary: Criar item
+      description: Cria um item e configura os parametros de alerta e controlo.
+      operationId: createItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateItemRequest'
+            examples:
+              default:
+                value:
+                  name: Detergente neutro
+                  unit: L
+                  total_quantity: 10.000
+                  min_stock: 2.000
+                  nearest_expiry: "31-08-2026"
+                  expiry_lead_time: 30
+                  is_active: true
+      responses:
+        '201':
+          description: Item criado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          description: Dados invalidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags:
+        - Items
+      summary: Listar itens
+      description: Lista itens com paginacao e filtros por nome e estado.
+      operationId: listItems
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: name
+          in: query
+          description: Filtro parcial por nome do item.
+          schema:
+            type: string
+        - name: is_active
+          in: query
+          description: Filtra por itens ativos ou inativos.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Lista paginada de itens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedItemsResponse'
+  /items/alerts:
+    get:
+      tags:
+        - Items
+      summary: Listar alertas
+      description: Retorna itens com estoque baixo, validade proxima ou ambos.
+      operationId: listItemAlerts
+      parameters:
+        - name: alert_type
+          in: query
+          description: Tipo de alerta a filtrar.
+          schema:
+            type: string
+            enum:
+              - LOW_STOCK
+              - EXPIRING_SOON
+              - ALL
+            default: ALL
+      responses:
+        '200':
+          description: Lista de itens em estado de alerta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemAlertsResponse'
+  /items/{id}:
+    patch:
+      tags:
+        - Items
+      summary: Atualizar item
+      description: Atualiza configuracoes do item ou realiza a sua inativacao.
+      operationId: updateItem
+      parameters:
+        - $ref: '#/components/parameters/ItemIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemRequest'
+            examples:
+              updateThresholds:
+                value:
+                  min_stock: 5.000
+                  expiry_lead_time: 45
+              deactivate:
+                value:
+                  is_active: false
+      responses:
+        '200':
+          description: Item atualizado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          description: Dados invalidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Item nao encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /movements:
+    post:
+      tags:
+        - Movements
+      summary: Registar movimentacao
+      description: |
+        Regista uma entrada (`INPUT`) ou saida (`USAGE`) de estoque.
+
+        Regras de negocio:
+        - `unit_price` e obrigatorio para `INPUT`.
+        - `USAGE` nao pode exceder o saldo atual do item.
+        - `balance_after` deve refletir o saldo residual apos a operacao.
+      operationId: createMovement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMovementRequest'
+            examples:
+              input:
+                value:
+                  item_id: 31aef2b2-5a16-4ae7-b0e5-009e31c3c65d
+                  type: INPUT
+                  quantity: 12.500
+                  unit_price: 3.75
+                  expiry_date: "15-09-2026"
+                  reason: Compra mensal
+              usage:
+                value:
+                  item_id: 31aef2b2-5a16-4ae7-b0e5-009e31c3c65d
+                  type: USAGE
+                  quantity: 0.750
+                  reason: Reposicao interna
+      responses:
+        '201':
+          description: Movimentacao registada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '400':
+          description: Violacao de regra de negocio ou dados invalidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficientBalance:
+                  value:
+                    code: INSUFFICIENT_BALANCE
+                    message: Quantidade solicitada excede o saldo disponivel.
+                    details:
+                      available_quantity: 5.000
+                      requested_quantity: 5.100
+                missingUnitPrice:
+                  value:
+                    code: UNIT_PRICE_REQUIRED
+                    message: unit_price e obrigatorio para movimentacoes do tipo INPUT.
+        '404':
+          description: Item nao encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /movements/{item_id}:
+    get:
+      tags:
+        - Movements
+      summary: Historico de movimentacoes do item
+      description: Retorna o historico imutavel de movimentacoes de um item especifico.
+      operationId: listItemMovements
+      parameters:
+        - $ref: '#/components/parameters/ItemIdPathForMovementParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Lista paginada do historico de movimentacoes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMovementsResponse'
+        '404':
+          description: Item nao encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Movements
+      summary: Operacao nao suportada
+      description: Movimentacoes sao imutaveis e nao podem ser alteradas.
+      operationId: replaceItemMovementHistoryNotAllowed
+      responses:
+        '405':
+          description: Method Not Allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                immutable:
+                  value:
+                    code: METHOD_NOT_ALLOWED
+                    message: Movimentacoes sao imutaveis. Utilize apenas POST para registo e GET para consulta.
+    delete:
+      tags:
+        - Movements
+      summary: Operacao nao suportada
+      description: Movimentacoes sao imutaveis e nao podem ser removidas.
+      operationId: deleteItemMovementHistoryNotAllowed
+      responses:
+        '405':
+          description: Method Not Allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  parameters:
+    ItemIdParam:
+      name: id
+      in: path
+      required: true
+      description: Identificador UUID do item.
+      schema:
+        type: string
+        format: uuid
+    ItemIdPathForMovementParam:
+      name: item_id
+      in: path
+      required: true
+      description: Identificador UUID do item.
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      description: Numero da pagina.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSizeParam:
+      name: page_size
+      in: query
+      description: Quantidade de registos por pagina.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    Item:
+      type: object
+      required:
+        - id
+        - name
+        - unit
+        - total_quantity
+        - min_stock
+        - expiry_lead_time
+        - is_active
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit:
+          $ref: '#/components/schemas/Unit'
+        total_quantity:
+          $ref: '#/components/schemas/DecimalQuantity'
+        min_stock:
+          $ref: '#/components/schemas/DecimalQuantity'
+        nearest_expiry:
+          allOf:
+            - $ref: '#/components/schemas/DateDdMmYyyy'
+          nullable: true
+          description: Data de validade mais proxima.
+        expiry_lead_time:
+          type: integer
+          minimum: 0
+          description: Dias de antecedencia para alerta de validade.
+        is_active:
+          type: boolean
+          default: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateItemRequest:
+      type: object
+      required:
+        - name
+        - unit
+        - total_quantity
+        - min_estoque
+        - expiry_lead_time
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit:
+          $ref: '#/components/schemas/Unit'
+        total_quantity:
+          $ref: '#/components/schemas/DecimalQuantity'
+        min_stock:
+          $ref: '#/components/schemas/DecimalQuantity'
+        nearest_expiry:
+          allOf:
+            - $ref: '#/components/schemas/DateDdMmYyyy'
+          nullable: true
+        expiry_lead_time:
+          type: integer
+          minimum: 0
+        is_active:
+          type: boolean
+          default: true
+    UpdateItemRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit:
+          $ref: '#/components/schemas/Unit'
+        min_stock:
+          $ref: '#/components/schemas/DecimalQuantity'
+        nearest_expiry:
+          allOf:
+            - $ref: '#/components/schemas/DateDdMmYyyy'
+          nullable: true
+        expiry_lead_time:
+          type: integer
+          minimum: 0
+        is_active:
+          type: boolean
+    Movement:
+      type: object
+      required:
+        - id
+        - item_id
+        - type
+        - quantity
+        - balance_after
+      properties:
+        id:
+          type: string
+          format: uuid
+        item_id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/MovementType'
+        quantity:
+          $ref: '#/components/schemas/DecimalQuantity'
+        unit_price:
+          $ref: '#/components/schemas/DecimalMoney'
+        balance_after:
+          $ref: '#/components/schemas/DecimalQuantity'
+        expiry_date:
+          allOf:
+            - $ref: '#/components/schemas/DateDdMmYyyy'
+          nullable: true
+        reason:
+          type: string
+          maxLength: 500
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    CreateMovementRequest:
+      oneOf:
+        - $ref: '#/components/schemas/CreateInputMovementRequest'
+        - $ref: '#/components/schemas/CreateUsageMovementRequest'
+    CreateInputMovementRequest:
+      type: object
+      required:
+        - item_id
+        - type
+        - quantity
+        - unit_price
+      properties:
+        item_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - INPUT
+        quantity:
+          $ref: '#/components/schemas/DecimalQuantity'
+        unit_price:
+          $ref: '#/components/schemas/DecimalMoney'
+        expiry_date:
+          allOf:
+            - $ref: '#/components/schemas/DateDdMmYyyy'
+          nullable: true
+          description: Opcional na entrada, usado para recalcular `nearest_expiry`.
+        reason:
+          type: string
+          maxLength: 500
+          nullable: true
+    CreateUsageMovementRequest:
+      type: object
+      required:
+        - item_id
+        - type
+        - quantity
+      properties:
+        item_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - USAGE
+        quantity:
+          $ref: '#/components/schemas/DecimalQuantity'
+        reason:
+          type: string
+          maxLength: 500
+          nullable: true
+    PaginatedItemsResponse:
+      type: object
+      required:
+        - data
+        - page
+        - page_size
+        - total
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    PaginatedMovementsResponse:
+      type: object
+      required:
+        - data
+        - page
+        - page_size
+        - total
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Movement'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    ItemAlertsResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - item
+              - alerts
+            properties:
+              item:
+                $ref: '#/components/schemas/Item'
+              alerts:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - LOW_STOCK
+                    - EXPIRING_SOON
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    Unit:
+      type: string
+      enum:
+        - UN
+        - KG
+        - L
+        - CX
+        - PCT
+    MovementType:
+      type: string
+      enum:
+        - INPUT
+        - USAGE
+    DecimalQuantity:
+      type: string
+      pattern: '^\d+(\.\d{1,3})?$'
+      example: "0.750"
+      description: Quantidade decimal com ate 3 casas para evitar perda de precisao.
+    DecimalMoney:
+      type: string
+      pattern: '^\d+(\.\d{1,4})?$'
+      example: "3.7500"
+      description: Valor monetario decimal. O arredondamento 4/5 e a compensacao da ultima parcela devem ser aplicados na camada de negocio.
+    DateDdMmYyyy:
+      type: string
+      pattern: '^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$'
+      example: "31-08-2026"
+      description: Data no formato DD-MM-YYYY.
+
