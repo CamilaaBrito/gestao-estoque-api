@@ -1,0 +1,22 @@
+{
+  "name": "gestao-estoque-api",
+  "version": "1.0.0",
+  "description": "API REST de gestao de estoque com Express e banco em memoria.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "express",
+    "api",
+    "estoque"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
+  }
+}

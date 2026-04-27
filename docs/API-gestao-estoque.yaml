@@ -17,11 +17,47 @@ servers:
   - url: http://localhost:3000
     description: Ambiente local
 tags:
+  - name: Auth
+    description: Autenticacao administrativa
   - name: Items
     description: Cadastro, configuracao e alertas de estoque
   - name: Movements
     description: Entradas e saidas com historico imutavel
+security:
+  - bearerAuth: []
 paths:
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login administrativo
+      description: Autentica o usuario administrador e retorna um token Bearer JWT.
+      operationId: loginAdmin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  username: admin
+                  password: admin123
+      responses:
+        '200':
+          description: Token JWT gerado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciais invalidas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /items:
     post:
       tags:
@@ -41,7 +77,7 @@ paths:
                   name: Detergente neutro
                   unit: L
                   total_quantity: 10.000
-                  min_stock: 2.000
+                  min_estoque: 2.000
                   nearest_expiry: "31-08-2026"
                   expiry_lead_time: 30
                   is_active: true
@@ -98,7 +134,7 @@ paths:
           schema:
             type: string
             enum:
-              - LOW_STOCK
+              - LOW_ESTOQUE
               - EXPIRING_SOON
               - ALL
             default: ALL
@@ -127,7 +163,7 @@ paths:
             examples:
               updateThresholds:
                 value:
-                  min_stock: 5.000
+                  min_estoque: 5.000
                   expiry_lead_time: 45
               deactivate:
                 value:
@@ -272,6 +308,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   parameters:
     ItemIdParam:
       name: id
@@ -307,6 +348,34 @@ components:
         maximum: 100
         default: 20
   schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: admin123
+    LoginResponse:
+      type: object
+      required:
+        - token_type
+        - access_token
+        - expires_in
+      properties:
+        token_type:
+          type: string
+          example: Bearer
+        access_token:
+          type: string
+        expires_in:
+          type: string
+          example: 8h
     Item:
       type: object
       required:
@@ -314,7 +383,7 @@ components:
         - name
         - unit
         - total_quantity
-        - min_stock
+        - min_estoque
         - expiry_lead_time
         - is_active
       properties:
@@ -329,7 +398,7 @@ components:
           $ref: '#/components/schemas/Unit'
         total_quantity:
           $ref: '#/components/schemas/DecimalQuantity'
-        min_stock:
+        min_estoque:
           $ref: '#/components/schemas/DecimalQuantity'
         nearest_expiry:
           allOf:
@@ -366,7 +435,7 @@ components:
           $ref: '#/components/schemas/Unit'
         total_quantity:
           $ref: '#/components/schemas/DecimalQuantity'
-        min_stock:
+        min_estoque:
           $ref: '#/components/schemas/DecimalQuantity'
         nearest_expiry:
           allOf:
@@ -388,7 +457,7 @@ components:
           maxLength: 255
         unit:
           $ref: '#/components/schemas/Unit'
-        min_stock:
+        min_estoque:
           $ref: '#/components/schemas/DecimalQuantity'
         nearest_expiry:
           allOf:
@@ -541,7 +610,7 @@ components:
                 items:
                   type: string
                   enum:
-                    - LOW_STOCK
+                    - LOW_ESTOQUE
                     - EXPIRING_SOON
     ErrorResponse:
       type: object
@@ -584,4 +653,6 @@ components:
       pattern: '^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$'
       example: "31-08-2026"
       description: Data no formato DD-MM-YYYY.
+
+
 
