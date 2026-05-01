@@ -9,17 +9,26 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "8h";
 
 function login(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw createAppError(400, "INVALID_PAYLOAD", "Corpo da requisicao invalido.");
+    throw createAppError(400, "INVALID_PAYLOAD", "Corpo da requisicão inválido.");
   }
 
   const { username, password } = payload;
 
-  if (typeof username !== "string" || typeof password !== "string") {
-    throw createAppError(400, "INVALID_CREDENTIALS", "username e password sao obrigatorios.");
-  }
+if (
+  typeof username !== "string" ||
+  typeof password !== "string" ||
+  !username.trim() ||
+  !password.trim()
+) {
+  throw createAppError(
+    400,
+    "INVALID_CREDENTIALS",
+    "username e password são obrigatórios."
+  );
+}
 
   if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-    throw createAppError(401, "INVALID_CREDENTIALS", "Credenciais invalidas.");
+    throw createAppError(401, "INVALID_CREDENTIALS", "Credenciais inválidas.");
   }
 
   const token = jwt.sign(
@@ -44,7 +53,7 @@ function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (_error) {
-    throw createAppError(401, "INVALID_TOKEN", "Token JWT invalido ou expirado.");
+    throw createAppError(401, "INVALID_TOKEN", "Token JWT inválido ou expirado.");
   }
 }
 

@@ -1,5 +1,3 @@
-const { randomUUID } = require("crypto");
-
 const itemModel = require("../models/itemModel");
 const movementModel = require("../models/movementModel");
 const itemsService = require("./itemsService");
@@ -12,9 +10,10 @@ const {
   toQuantityNumber,
   parseInteger
 } = require("../utils/numberUtils");
-const { isValidDdMmYyyy } = require("../utils/dateUtils");
+const { isValidDateFormatDdMmYyyy, isValidDdMmYyyy, isExpiryDateInThePast } = require("../utils/dateUtils");
 const { buildPageResponse, paginate } = require("../utils/pagination");
 const { createAppError } = require("../utils/errors");
+const { generateMovementId } = require("../utils/idGenerator");
 
 const MOVEMENT_TYPES = new Set(["INPUT", "USAGE"]);
 
@@ -34,33 +33,51 @@ function serializeMovement(movement) {
 
 function validateMovementPayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw createAppError(400, "INVALID_PAYLOAD", "Corpo da requisicao invalido.");
+    throw createAppError(400, "INVALID_PAYLOAD", "Corpo da requisição inválido.");
   }
 
-  if (typeof payload.item_id !== "string" || !payload.item_id.trim()) {
-    throw createAppError(400, "INVALID_ITEM_ID", "item_id e obrigatorio.");
-  }
+  parseInteger(payload.item_id, "item_id", { min: 1 });
 
   if (!MOVEMENT_TYPES.has(payload.type)) {
     throw createAppError(400, "INVALID_MOVEMENT_TYPE", "type deve ser INPUT ou USAGE.");
   }
 
-  parseDecimal(payload.quantity, "quantity", 3);
+  parseDecimal(payload.quantity, "quantity", 2);
 
-  if (payload.type === "INPUT" && (payload.unit_price === undefined || payload.unit_price === null || payload.unit_price === "")) {
+  if (payload.type === "INPUT") {
+    if (
+      payload.unit_price === undefined ||
+      payload.unit_price === null ||
+      payload.unit_price === ""
+    ) {
+      throw createAppError(
+        400,
+        "UNIT_PRICE_REQUIRED",
+        "unit_price é obrigatório para INPUT (pode ser 0)."
+      );
+    }
+
+    parseDecimal(payload.unit_price, "unit_price", 2);
+  }
+
+  if (payload.type === "USAGE" && payload.unit_price !== undefined) {
     throw createAppError(
       400,
-      "UNIT_PRICE_REQUIRED",
-      "unit_price e obrigatorio para movimentacoes do tipo INPUT."
+      "UNIT_PRICE_NOT_ALLOWED",
+      "unit_price não deve ser enviado para USAGE."
     );
   }
 
-  if (payload.unit_price !== undefined && payload.unit_price !== null) {
-    parseDecimal(payload.unit_price, "unit_price", 4);
+  if (payload.expiry_date !== undefined && payload.expiry_date !== null && !isValidDateFormatDdMmYyyy(payload.expiry_date)) {
+    throw createAppError(400, "INVALID_DATE_FORMAT", "Data de validade deve estar no formato DD-MM-YYYY.");
   }
 
   if (payload.expiry_date !== undefined && payload.expiry_date !== null && !isValidDdMmYyyy(payload.expiry_date)) {
-    throw createAppError(400, "INVALID_DATE", "expiry_date deve estar no formato DD-MM-YYYY.");
+    throw createAppError(400, "INVALID_DATE", "Esta data não é válida.");
+  }
+
+  if (payload.expiry_date !== undefined && payload.expiry_date !== null && isExpiryDateInThePast(payload.expiry_date)) {
+    throw createAppError(400, "EXPIRY_DATE_IN_THE_PAST", "Data de validade não pode ser uma data passada.");
   }
 
   if (payload.reason !== undefined && payload.reason !== null && typeof payload.reason !== "string") {
@@ -71,26 +88,31 @@ function validateMovementPayload(payload) {
 function createMovement(payload) {
   validateMovementPayload(payload);
 
-  const item = itemModel.findById(payload.item_id);
+  const itemId = parseInteger(payload.item_id, "item_id", { min: 1 });
+
+  const item = itemModel.findById(itemId);
 
   if (!item) {
-    throw createAppError(404, "ITEM_NOT_FOUND", "Item nao encontrado.");
+    throw createAppError(404, "ITEM_NOT_FOUND", "Item não encontrado.");
   }
 
   const quantity = toQuantityNumber(payload.quantity);
+
+  if (quantity <= 0) {
+    throw createAppError(400, "INVALID_QUANTITY", "quantity deve ser maior que zero.");
+  }
+
+  let unitPrice = null;
+
+  if (payload.type === "INPUT") {
+    unitPrice = applyMoneyRounding(toMoneyNumber(payload.unit_price));
+  }
+
   let updatedBalance = item.total_quantity;
 
   if (payload.type === "USAGE") {
     if (quantity > item.total_quantity) {
-      throw createAppError(
-        400,
-        "INSUFFICIENT_BALANCE",
-        "Quantidade solicitada excede o saldo disponivel.",
-        {
-          available_quantity: formatQuantity(item.total_quantity),
-          requested_quantity: formatQuantity(quantity)
-        }
-      );
+      throw createAppError(400, "INSUFFICIENT_BALANCE", "Quantidade excede o saldo.");
     }
 
     updatedBalance = item.total_quantity - quantity;
@@ -99,11 +121,12 @@ function createMovement(payload) {
   }
 
   const movement = {
-    id: randomUUID(),
-    item_id: payload.item_id,
+    id: generateMovementId(),
+    item_id: itemId,
     type: payload.type,
     quantity,
-    unit_price: payload.unit_price === undefined || payload.unit_price === null ? null : applyMoneyRounding(toMoneyNumber(payload.unit_price)),
+    batch_id: payload.batch_id ?? null,
+    unit_price: unitPrice,
     balance_after: updatedBalance,
     expiry_date: payload.expiry_date ?? null,
     reason: payload.reason ?? null,
@@ -124,18 +147,26 @@ function createMovement(payload) {
   return serializeMovement(movement);
 }
 
+
 function listItemMovements(itemId, query) {
-  const item = itemModel.findById(itemId);
+
+  const parsedItemId = parseInteger(itemId, "item_id", { min: 1 });
+
+  const item = itemModel.findById(parsedItemId);
 
   if (!item) {
-    throw createAppError(404, "ITEM_NOT_FOUND", "Item nao encontrado.");
+    throw createAppError(404, "ITEM_NOT_FOUND", "Item não encontrado.");
+  }
+
+  if (item.deleted_at) {
+    throw createAppError(404, "ITEM_DELETED", "Item foi deletado e não pode ter seu histórico consultado.");
   }
 
   const page = parseInteger(query.page ?? 1, "page", { min: 1 });
   const pageSize = parseInteger(query.page_size ?? 20, "page_size", { min: 1, max: 100 });
 
   const sortedMovements = movementModel
-    .listByItemId(itemId)
+    .listByItemId(parsedItemId)
     .slice()
     .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
 

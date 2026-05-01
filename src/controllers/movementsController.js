@@ -21,7 +21,7 @@ async function listItemMovements(request, response, next) {
 async function methodNotAllowed(_request, _response, next) {
   next(
     movementsService.createMethodNotAllowedError(
-      "Movimentacoes sao imutaveis. Utilize apenas POST para registo e GET para consulta."
+      "Movimentações sao imutáveis. Utilize apenas POST para registo e GET para consulta."
     )
   );
 }

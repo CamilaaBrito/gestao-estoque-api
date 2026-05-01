@@ -27,6 +27,7 @@ async function updateItem(request, response, next) {
   }
 }
 
+
 async function listAlerts(request, response, next) {
   try {
     const result = itemsService.listAlerts(request.query);

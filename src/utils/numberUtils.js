@@ -5,14 +5,14 @@ function parseDecimal(value, fieldName, maxDecimals) {
   const regex = new RegExp(`^\\d+(\\.\\d{1,${maxDecimals}})?$`);
 
   if (!regex.test(normalized)) {
-    throw createAppError(400, "INVALID_DECIMAL", `${fieldName} deve ser um decimal valido com ate ${maxDecimals} casas.`);
+    throw createAppError(400, "INVALID_DECIMAL", `${fieldName} deve ser um decimal válido com ate ${maxDecimals} casas.`);
   }
 
   return normalized;
 }
 
 function toQuantityNumber(value) {
-  return Number(parseDecimal(value, "quantity", 3));
+  return Number(parseDecimal(value, "quantity", 2));
 }
 
 function toMoneyNumber(value) {
@@ -23,7 +23,7 @@ function parseInteger(value, fieldName, options = {}) {
   const integerValue = Number(value);
 
   if (!Number.isInteger(integerValue)) {
-    throw createAppError(400, "INVALID_INTEGER", `${fieldName} deve ser um numero inteiro.`);
+    throw createAppError(400, "INVALID_INTEGER", `${fieldName} deve ser um número inteiro.`);
   }
 
   if (options.min !== undefined && integerValue < options.min) {
@@ -42,11 +42,24 @@ function applyMoneyRounding(value) {
 }
 
 function formatQuantity(value) {
-  return Number(value).toFixed(3);
+  const numericValue = Number(value);
+
+  if (Number.isInteger(numericValue)) {
+    return String(numericValue);
+  }
+
+  return numericValue.toFixed(2).replace(".", ",");
 }
 
 function formatMoney(value) {
-  return Number(value).toFixed(4);
+    const numericValue = Number(value);
+
+      if (Number.isInteger(numericValue)) {
+        return String(numericValue);
+      }
+
+  return numericValue.toFixed(2).replace(".", ",");
+  
 }
 
 module.exports = {
@@ -58,3 +71,5 @@ module.exports = {
   formatQuantity,
   formatMoney
 };
+
+
