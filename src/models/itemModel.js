@@ -28,5 +28,5 @@ module.exports = {
   create,
   findById,
   update,
-  list
+  list,
 };

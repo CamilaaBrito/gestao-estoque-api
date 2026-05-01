@@ -10,6 +10,21 @@ const swaggerDocument = YAML.load(path.resolve(__dirname, "../docs/API-gestao-es
 
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.json({
+    name: "Gestão de Estoque API",
+    version: "1.0.0",
+    docs: "/docs-api",
+    health: "/health"
+  });
+});
+
+app.get("/", (_request, response) => {
+  response.json({
+    message: "API Gestão de Estoque rodando"
+  });
+});
+
 app.get("/health", (_request, response) => {
   response.json({
     status: "ok",
