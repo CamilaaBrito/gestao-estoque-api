@@ -73,7 +73,7 @@ function validateMovementPayload(payload) {
   }
 
   if (payload.expiry_date !== undefined && payload.expiry_date !== null && !isValidDdMmYyyy(payload.expiry_date)) {
-    throw createAppError(400, "INVALID_DATE", "Esta data não é válida.");
+    throw createAppError(400, "INVALID_DATE", "Data de validade deve estar no formato DD-MM-YYYY.");
   }
 
   if (payload.expiry_date !== undefined && payload.expiry_date !== null && isExpiryDateInThePast(payload.expiry_date)) {
@@ -112,7 +112,7 @@ function createMovement(payload) {
 
   if (payload.type === "USAGE") {
     if (quantity > item.total_quantity) {
-      throw createAppError(400, "INSUFFICIENT_BALANCE", "Quantidade excede o saldo.");
+      throw createAppError(400, "INSUFFICIENT_BALANCE", "Quantidade excede o saldo disponível.");
     }
 
     updatedBalance = item.total_quantity - quantity;
@@ -158,9 +158,6 @@ function listItemMovements(itemId, query) {
     throw createAppError(404, "ITEM_NOT_FOUND", "Item não encontrado.");
   }
 
-  if (item.deleted_at) {
-    throw createAppError(404, "ITEM_DELETED", "Item foi deletado e não pode ter seu histórico consultado.");
-  }
 
   const page = parseInteger(query.page ?? 1, "page", { min: 1 });
   const pageSize = parseInteger(query.page_size ?? 20, "page_size", { min: 1, max: 100 });

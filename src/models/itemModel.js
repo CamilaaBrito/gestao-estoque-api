@@ -24,15 +24,6 @@ function list() {
   return db.items;
 }
 
-function delete_(id) {
-  const index = db.items.findIndex((item) => item.id === id);
-
-  if (index === -1) {
-    return null;
-  }
-
-}
-
 module.exports = {
   create,
   findById,
