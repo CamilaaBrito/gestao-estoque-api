@@ -1,0 +1,12 @@
+{
+    "novoItem": {
+        "name": "Chocolate",
+        "unit": "PCT",
+        "total_quantity": 10,
+        "unit_price": 1,
+        "min_estoque": 2,
+        "nearest_expiry": "31-08-2026",
+        "expiry_lead_time": 30,
+        "is_active": true
+    }
+}
