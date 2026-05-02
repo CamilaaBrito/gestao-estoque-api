@@ -1,10 +1,10 @@
 require('dotenv').config();
 const { expect } = require("chai");
 const request = require("supertest");
-const app = require("../src/app");
-const { obterToken } = require('../helpers/autenticacao');
-const { criarItem } = require("../helpers/criarItem");
-const postEntradaItem = require("../fixtures/postEntradaItem.json");
+const app = require("../../src/app");
+const { obterToken } = require('../../helpers/autenticacao');
+const { criarItem } = require("../../helpers/criarItem");
+const postEntradaItem = require("../../fixtures/postEntradaItem.json");
 
 describe("Movimentações", () => {
     let token;
@@ -39,7 +39,7 @@ describe("Movimentações", () => {
             expect(resposta.body).to.have.property("reason").equal("reposição");
         });
 
-        it("Deve validar que o campo expiry_date(data de validade) é obrigatório ao dar entrada em um item", async () => {
+        it("Deve validar que o campo expiry_date(data de validade) não é necessário quando a justificativa é 'reposição'", async () => {
             const movementPayload = {
                 ...postEntradaItem,
                 item_id: itemId
@@ -51,9 +51,9 @@ describe("Movimentações", () => {
                 .set('Authorization', `Bearer ${token}`)
                 .send(movementPayload);
 
-            expect(resposta.status).to.equal(400);
-            expect(resposta.body).to.have.property("code").equal("EXPIRY_DATE_REQUIRED");
-            expect(resposta.body).to.have.property("message");
+            expect(resposta.status).to.equal(201);
+            expect(resposta.body).to.have.property("reason").equal("reposição");
+            expect(resposta.body).to.have.property("expiry_date").equal(null);
         });
 
         it("Deve validar que o item_id é criado ao dar entrada em um produto", async () => {
@@ -202,7 +202,7 @@ describe("Movimentações", () => {
             expect(resposta.body).to.have.property("code").equal("INVALID_QUANTITY");
         });
 
-        it("Deve rejeitar saídas maiores do que a quantidade de items", async () => {
+        it("Deve rejeitar saídas maiores do que a quantidade de items (Saldo insuficiente)", async () => {
             const movementPayload = {
                 item_id: itemId,
                 type: "USAGE",

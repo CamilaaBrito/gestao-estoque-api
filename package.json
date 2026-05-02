@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "mocha test/**/*.test.js"
+    "test": "mocha test/**/*.test.js",
+    "test:report": "mocha test/**/*.test.js --reporter mochawesome"
   },
   "keywords": [
     "express",
@@ -24,6 +25,7 @@
     "chai": "^6.2.2",
     "dotenv": "^17.4.2",
     "mocha": "^11.7.5",
+    "mochawesome": "^7.1.4",
     "supertest": "^7.2.2"
   }
 }
