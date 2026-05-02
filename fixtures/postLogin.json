@@ -1,0 +1,23 @@
+{
+    "valida":{
+        "username":"admin",
+        "password": "admin123"
+
+    }
+,
+    "invalida":{
+
+    "username":"admin1",
+    "password": "admin123"
+
+    }
+,
+
+    "sem_senha":{
+
+    "username":"admin",
+    "password": ""
+
+    }
+
+}
