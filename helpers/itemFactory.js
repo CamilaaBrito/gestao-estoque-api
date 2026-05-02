@@ -1,4 +1,4 @@
-const postItems = require("./postItems.json");
+const postItems = require("../fixtures/postItems.json");
 
 function gerarItemAleatorio() {
     const item = { ...postItems.novoItem };

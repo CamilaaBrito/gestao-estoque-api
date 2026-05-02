@@ -4,7 +4,8 @@ const request = require("supertest");
 const app = require("../src/app");
 const { obterToken } = require('../helpers/autenticacao')
 const postItems = require("../fixtures/postItems.json");
-const { gerarItemAleatorio } = require("../fixtures/itemFactory");
+const { gerarItemAleatorio } = require("../helpers/itemFactory");
+const { criarItem } = require("../helpers/criarItem");
 
 
 describe("Cadastro de items", () => {
@@ -203,11 +204,7 @@ describe("Cadastro de items", () => {
         it("Deve rejeitar o cadastro de nomes duplicados", async () => {
             const bodyItem = gerarItemAleatorio();
 
-            await request(process.env.BASE_URL)
-                .post("/items")
-                .set('Content-Type', 'application/json')
-                .set('Authorization', `Bearer ${token}`)
-                .send(bodyItem);
+            await criarItem(token, bodyItem);
 
             const resposta = await request(process.env.BASE_URL)
                 .post("/items")
