@@ -1,8 +1,8 @@
 require('dotenv').config();
 const { expect } = require("chai");
 const request = require("supertest");
-const app = require("../src/app");
-const postLogin = require("../fixtures/postLogin.json");
+const app = require("../../src/app");
+const postLogin = require("../../fixtures/postLogin.json");
 
 describe("Login - Autenticação", () => {
 

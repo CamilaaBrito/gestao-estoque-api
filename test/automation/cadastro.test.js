@@ -1,11 +1,11 @@
 require('dotenv').config();
 const { expect } = require("chai");
 const request = require("supertest");
-const app = require("../src/app");
-const { obterToken } = require('../helpers/autenticacao')
-const postItems = require("../fixtures/postItems.json");
-const { gerarItemAleatorio } = require("../helpers/itemFactory");
-const { criarItem } = require("../helpers/criarItem");
+const app = require("../../src/app");
+const { obterToken } = require('../../helpers/autenticacao')
+const postItems = require("../../fixtures/postItems.json");
+const { gerarItemAleatorio } = require("../../helpers/itemFactory");
+const { criarItem } = require("../../helpers/criarItem");
 
 
 describe("Cadastro de items", () => {
@@ -182,7 +182,7 @@ describe("Cadastro de items", () => {
                 .send(bodyItem);
 
             expect(resposta.status).to.equal(400);
-            expect(resposta.body).to.have.property("code").equal("INVALID_DECIMAL");
+            expect(resposta.body).to.have.property("code").equal("INVALID_UNIT_PRICE");
             expect(resposta.body).to.have.property("message");
         });
 
@@ -197,7 +197,7 @@ describe("Cadastro de items", () => {
                 .send(bodyItem);
 
             expect(resposta.status).to.equal(400);
-            expect(resposta.body).to.have.property("code").equal("INVALID_DECIMAL");
+            expect(resposta.body).to.have.property("code").equal("INVALID_MIN_STOCK");
             expect(resposta.body).to.have.property("message");
         });
 
