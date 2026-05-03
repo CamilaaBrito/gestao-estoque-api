@@ -95,13 +95,19 @@ BASE_URL="http://localhost:3000"
 - [Node.js](https://nodejs.org/) v18 ou superior
 - [k6](https://k6.io/docs/get-started/installation/) instalado globalmente (para testes de performance)
 
-### 1. Instalar dependências
+### 1. Clonar o reposítório
+
+```bash
+https://github.com/CamilaaBrito/gestao-estoque-api.git
+```
+
+### 2. Instalar dependências
 
 ```bash
 npm install
 ```
 
-### 2. Iniciar a API
+### 3. Iniciar a API
 
 ```bash
 npm start
@@ -109,7 +115,7 @@ npm start
 
 > A API ficará disponível em `http://localhost:3000`.
 
-### 3. Executar os Testes de Integração
+### 4. Executar os Testes de Integração
 
 ```bash
 # Roda todos os testes e exibe resultado no terminal
@@ -119,7 +125,7 @@ npm test
 npm run test:report
 ```
 
-### 4. Executar os Testes de Performance (k6)
+### 5. Executar os Testes de Performance (k6)
 
 Certifique-se de que a API está rodando antes de executar os testes de performance.
 
